@@ -1,0 +1,4 @@
+.productsSeed.js
+.env
+node_modules
+.env.local
