@@ -42,8 +42,8 @@ export default function HistoryTab({
 
     // Sort by timestamp descending (latest first)
     filtered.sort((a, b) => {
-      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      const timeA = new Date(a.timestamp || a.date).getTime() || 0;
+      const timeB = new Date(b.timestamp || b.date).getTime() || 0;
       return timeB - timeA;
     });
 
@@ -65,7 +65,7 @@ export default function HistoryTab({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-lg border">
             <ConditionPerProductChart
-              type="OUT"
+              type="KELUAR"
               transactions={transactions}
               products={products}
               conditions={CONDITIONS_OUT}
@@ -145,8 +145,8 @@ export default function HistoryTab({
                 onChange={(e) => setFilterType(e.target.value)}
               >
                 <option value="ALL">Semua</option>
-                <option value="IN">Masuk</option>
-                <option value="OUT">Keluar</option>
+                <option value="MASUK">Masuk</option>
+                <option value="KELUAR">Keluar</option>
               </select>
             </div>
             <div>
@@ -216,27 +216,27 @@ export default function HistoryTab({
               ) : (
                 filteredTransactions.map((tx) => (
                   <tr
-                    key={tx.id}
+                    key={`${tx.id}-${tx.type}-${Math.random()}`}
                     className="border-b hover:bg-gray-50"
                   >
                     <td className="px-4 py-2">
-                      {tx.date}{" "}
+                      {tx.date ? tx.date.substring(0, 10) : "-"}{" "}
                       <span className="text-xs text-gray-400">
-                        {tx.timestamp
-                          ? new Date(tx.timestamp).toLocaleTimeString(
-                            "id-ID"
+                        {(tx.timestamp || tx.date)
+                          ? new Date(tx.timestamp || tx.date).toLocaleTimeString(
+                            "id-ID", { hour: '2-digit', minute: '2-digit' }
                           )
                           : ""}
                       </span>
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-bold ${tx.type === "IN"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                        className={`px-2 py-1 rounded-full text-xs font-bold ${tx.type === "MASUK"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
                           }`}
                       >
-                        {tx.type === "IN" ? "MASUK" : "KELUAR"}
+                        {tx.type}
                       </span>
                     </td>
                     <td className="px-4 py-2 font-medium">

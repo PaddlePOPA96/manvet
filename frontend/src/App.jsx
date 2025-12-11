@@ -74,7 +74,8 @@ export default function InventoryApp() {
     downloadCSV,
     addCategory,
     deleteCategory,
-    refreshCategories
+    refreshCategories,
+    adjustStock // Destructure the function
   } = useInventoryData(token);
 
   useEffect(() => {
@@ -177,9 +178,9 @@ export default function InventoryApp() {
       >
         {activeTab === "dashboard" && (
           <DashboardTab
-            inventoryData={inventoryData}
-            periodTotals={periodTotals}
-            periodSalesByDate={periodSalesByDate}
+            periodPreset={periodPreset}
+            periodFrom={periodFrom}
+            periodTo={periodTo}
           />
         )}
 
@@ -199,6 +200,7 @@ export default function InventoryApp() {
               setSelectedProductName(name);
               setActiveTab("productDetail");
             }}
+            adjustStockFn={adjustStock} // Pass the function directly
           />
         )}
 

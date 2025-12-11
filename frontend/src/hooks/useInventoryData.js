@@ -17,12 +17,13 @@ function calculateInventory(products, transactions) {
       out: 0,
       waste: 0,
       quarantine: 0,
-      stock: 0
+      stock: p.stock // TRUST BACKEND STOCK DIRECTLY
     };
   });
 
   transactions.forEach((tx) => {
     if (!inventory[tx.product]) {
+      // If product exists in transaction but not in product list (deleted?), skip stock logic or init 0
       inventory[tx.product] = {
         name: tx.product,
         price: 0,
@@ -36,7 +37,7 @@ function calculateInventory(products, transactions) {
     }
     const qty = parseInt(tx.quantity, 10) || 0;
 
-    if (tx.type === "IN") {
+    if (tx.type === "IN" || tx.type === "MASUK") {
       if (
         [
           "Barang Diterima dari Produksi",
@@ -44,22 +45,22 @@ function calculateInventory(products, transactions) {
         ].includes(tx.condition)
       ) {
         inventory[tx.product].in += qty;
-        inventory[tx.product].stock += qty;
+        // inventory[tx.product].stock += qty; // REMOVED: Stock handled by Backend
       } else if (tx.condition === "Retur Barang Rusak Karena Pengiriman") {
         inventory[tx.product].quarantine += qty;
       } else {
         inventory[tx.product].waste += qty;
-        inventory[tx.product].stock -= qty;
+        // inventory[tx.product].stock -= qty; // REMOVED
       }
-    } else if (tx.type === "OUT") {
+    } else if (tx.type === "OUT" || tx.type === "KELUAR") {
       if (
         ["Defects / Cacat Produksi", "Kadaluarsa"].includes(tx.condition)
       ) {
         inventory[tx.product].waste += qty;
-        inventory[tx.product].stock -= qty;
+        // inventory[tx.product].stock -= qty; // REMOVED
       } else {
         inventory[tx.product].out += qty;
-        inventory[tx.product].stock -= qty;
+        // inventory[tx.product].stock -= qty; // REMOVED
 
         if (
           ["SALE", "Reseller", "Consignment (titip jual)"].includes(
@@ -87,7 +88,7 @@ function calculateSalesByDate(products, transactions) {
 
   transactions.forEach((tx) => {
     if (
-      tx.type !== "OUT" ||
+      (tx.type !== "OUT" && tx.type !== "KELUAR") ||
       !["SALE", "Reseller", "Consignment (titip jual)"].includes(
         tx.condition
       )
@@ -101,7 +102,7 @@ function calculateSalesByDate(products, transactions) {
       0;
     const revenue = price * qty;
     const dateKey =
-      tx.date ||
+      (tx.date && tx.date.split("T")[0]) ||
       (tx.timestamp &&
         new Date(tx.timestamp).toISOString().split("T")[0]);
     if (!dateKey) return;
@@ -128,18 +129,21 @@ export function useInventoryData(token) {
         return;
       }
 
-      const authHeader = {
-        Authorization: `Bearer ${token}`
-      };
-
       try {
         setLoading(true);
         setError("");
-        const [prodRes, txRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/products`, {
+        const authHeader = {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
+        };
+        const [prodRes, txRes, mutRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/products?limit=1000`, {
             headers: authHeader
           }),
-          fetch(`${API_BASE_URL}/api/transactions`, {
+          fetch(`${API_BASE_URL}/api/transaksi?limit=300`, { // OPTIMIZED: Reduced limit
+            headers: authHeader
+          }),
+          fetch(`${API_BASE_URL}/api/mutasi-stok?limit=300`, { // OPTIMIZED: Reduced limit
             headers: authHeader
           })
         ]);
@@ -150,12 +154,24 @@ export function useInventoryData(token) {
         if (!txRes.ok) {
           throw new Error("Failed to fetch transactions");
         }
+        // Mutation failure is non-critical for now, but good to catch
+        if (!mutRes.ok) {
+          console.warn("Failed to fetch mutations");
+        }
 
         const productsData = await prodRes.json();
         const transactionsData = await txRes.json();
+        const mutationsData = await mutRes.json();
 
-        setProducts(productsData);
-        setTransactions(transactionsData);
+        // Unwrap specific backend response format
+        const txList = transactionsData.data || transactionsData;
+        const muList = mutationsData.data || mutationsData;
+
+        // Merge transactions (Sales) and Stock Mutations (IN/Adjustments)
+        const combinedTransactions = [...txList, ...muList];
+
+        setProducts(productsData.data || productsData);
+        setTransactions(combinedTransactions);
       } catch (err) {
         console.error(
           "Error fetching data from Prisma/Supabase API:",
@@ -182,7 +198,7 @@ export function useInventoryData(token) {
       });
       if (res.ok) {
         const data = await res.json();
-        setProducts(data);
+        setProducts(data.data || data);
       }
     } catch (err) {
       console.error("Failed to refresh products", err);
@@ -199,7 +215,8 @@ export function useInventoryData(token) {
       });
       if (res.ok) {
         const data = await res.json();
-        setCategories(data.map((c) => c.name));
+        const categoryList = data.data || data;
+        setCategories(categoryList.map((c) => c.name));
       }
     } catch (err) {
       console.error("Failed to fetch categories", err);
@@ -243,16 +260,18 @@ export function useInventoryData(token) {
     const priceAtTx = productInfo ? productInfo.price || 0 : 0;
 
     try {
-      await fetch(`${API_BASE_URL}/api/transactions`, {
+      const res = await fetch(`${API_BASE_URL}/api/transaksi`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           date: data.date,
           items: [
             {
+              type: "ITEM", // REQUIRED by Backend
               qty: data.quantity || 1,
               basePrice: data.basePrice || priceAtTx,
               price: data.price || priceAtTx,
@@ -267,18 +286,19 @@ export function useInventoryData(token) {
         })
       });
 
-      const txRes = await fetch(`${API_BASE_URL}/api/transactions`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (txRes.ok) {
-        const txData = await txRes.json();
-        setTransactions(txData);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menyimpan transaksi (API Error)");
       }
+
+      // Optimistic Update: Append new data directly
+      const resData = await res.json();
+      const newItems = resData.data || []; // Array of flattened items
+      setTransactions((prev) => [...newItems, ...prev]);
+
     } catch (e) {
       console.error("Failed to add transaction via Prisma API", e);
-      alert("Gagal menyimpan transaksi ke Supabase/Prisma API.");
+      alert(`Gagal menyimpan transaksi: ${e.message}`);
     }
   };
 
@@ -296,15 +316,16 @@ export function useInventoryData(token) {
     }
 
     try {
-      await fetch(`${API_BASE_URL}/api/stock-mutations`, {
+      const res = await fetch(`${API_BASE_URL}/api/mutasi-stok`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           productId: productInfo.id,
-          type: data.type,
+          type: data.type === "MASUK" ? "IN" : (data.type === "KELUAR" ? "OUT" : data.type), // Handle localized input if any
           condition: data.condition,
           quantity: data.quantity,
           date: data.date,
@@ -313,18 +334,21 @@ export function useInventoryData(token) {
         })
       });
 
-      const txRes = await fetch(`${API_BASE_URL}/api/transactions`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (txRes.ok) {
-        const txData = await txRes.json();
-        setTransactions(txData);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Gagal menyimpan mutasi (API Error)");
       }
+
+      // Optimistic Update: Append new data directly
+      const resData = await res.json();
+      const newItem = resData.data; // Single object
+
+      // StockMutationResource returns localized 'type'. Ensure it matches what frontend list expects.
+      setTransactions((prev) => [newItem, ...prev]);
+
     } catch (e) {
       console.error("Failed to add stock mutation via Prisma API", e);
-      alert("Gagal menyimpan mutasi stok ke Supabase/Prisma API.");
+      alert(`Gagal menyimpan mutasi: ${e.message}`);
     }
   };
 
@@ -408,6 +432,56 @@ export function useInventoryData(token) {
     link.click();
   };
 
+  const adjustStock = async (productId, realStock, date, note) => {
+    if (!productId) return;
+    try {
+      // NOTE: use API_BASE_URL to call Laravel backend
+      const res = await fetch(`${API_BASE_URL}/api/products/${productId}/adjust`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ realStock, date, note })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to adjust stock");
+      }
+
+      await refreshProducts(); // Refresh to see updated stock
+
+      const resData = await res.json();
+      const mutation = resData.mutation;
+
+      // Update transactions state with the new mutation
+      if (mutation) {
+        // Flatten or format if necessary to match transaction structure
+        // StockMutationResource returns: { id, productId, type, quantity, date, condition, product: {name...} }
+        // Frontend expects: { id, product (name), type, quantity, date, condition, ... }
+
+        // We need product name
+        const pName = products.find(p => p.id === productId)?.name || "Unknown";
+
+        const newTx = {
+          id: mutation.id,
+          product: pName,
+          type: mutation.type === 'IN' ? 'MASUK' : (mutation.type === 'OUT' ? 'KELUAR' : mutation.type),
+          quantity: mutation.quantity,
+          date: mutation.date,
+          condition: mutation.condition,
+          timestamp: new Date().toISOString() // Helper for sorting
+        };
+
+        setTransactions(prev => [newTx, ...prev]);
+      }
+
+    } catch (e) {
+      console.error("Failed to adjust stock", e);
+      alert("Gagal melakukan penyesuaian stok.");
+    }
+  };
+
   const downloadCSV = () => {
     if (transactions.length === 0)
       return alert("Belum ada data transaksi.");
@@ -473,6 +547,7 @@ export function useInventoryData(token) {
     categories,
     addCategory,
     deleteCategory,
-    refreshCategories
+    refreshCategories,
+    adjustStock
   };
 }

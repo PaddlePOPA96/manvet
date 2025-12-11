@@ -1,0 +1,1 @@
+import{j as t}from"./index-ChC7JKR1.js";function s({className:e="",...r}){return t.jsx("input",{className:`w-full border rounded px-2 py-2 text-sm bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100 disabled:text-gray-400 ${e}`,...r})}export{s as I};

@@ -1,5 +1,5 @@
-import React from "react";
-import { Search, Filter, FileText, List, Download, Upload } from "lucide-react";
+import React, { useState } from "react";
+import { Search, Filter, FileText, List, Download, Upload, Edit } from "lucide-react";
 import { formatRupiah } from "../utils/format";
 
 export default function StockTab({
@@ -13,8 +13,59 @@ export default function StockTab({
   downloadCSV,
   fileInputRef,
   handleRestore,
-  onSelectProduct
+  onSelectProduct,
+  adjustStockFn // Function from useInventoryData to call API
 }) {
+  const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
+  const [selectedProductForOpname, setSelectedProductForOpname] = useState(null);
+  const [opnameRealStock, setOpnameRealStock] = useState("");
+  const [opnameNote, setOpnameNote] = useState("");
+  const [processingOpname, setProcessingOpname] = useState(false);
+
+  const openOpnameModal = (product) => {
+    setSelectedProductForOpname(product);
+    setOpnameRealStock(product.stock); // Default to current stock
+    setOpnameNote("");
+    setIsOpnameModalOpen(true);
+  };
+
+  const closeOpnameModal = () => {
+    setIsOpnameModalOpen(false);
+    setSelectedProductForOpname(null);
+    setProcessingOpname(false);
+  };
+
+  const handleOpnameSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProductForOpname) return;
+
+    // Find the full product object from the products list to get ID
+    // filteredInventory might only have 'name', 'stock', 'price' etc from calculateInventory
+    // We need the product ID.
+    // Let's assume passed 'products' prop has all info.
+    const productFull = products.find(p => p.name === selectedProductForOpname.name);
+
+    if (!productFull) {
+      alert("Product data not found");
+      return;
+    }
+
+    setProcessingOpname(true);
+    try {
+      await adjustStockFn(
+        productFull.id,
+        parseInt(opnameRealStock, 10),
+        new Date().toISOString(),
+        opnameNote
+      );
+      closeOpnameModal();
+    } catch (error) {
+      console.error("Opname failed", error);
+      // Error handling is inside adjustStockFn typically, but in case:
+      setProcessingOpname(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
@@ -23,11 +74,10 @@ export default function StockTab({
           <div className="flex gap-2 w-full md:w-auto">
             <button
               onClick={() => setShowLowStockOnly(!showLowStockOnly)}
-              className={`flex items-center gap-2 px-3 py-1 rounded border text-sm transition ${
-                showLowStockOnly
+              className={`flex items-center gap-2 px-3 py-1 rounded border text-sm transition ${showLowStockOnly
                   ? "bg-orange-100 border-orange-300 text-orange-800"
                   : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
               <Filter size={14} />{" "}
               {showLowStockOnly
@@ -61,6 +111,7 @@ export default function StockTab({
                   Stok
                 </th>
                 <th className="px-4 py-2 text-center">Status</th>
+                <th className="px-4 py-2 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -114,6 +165,15 @@ export default function StockTab({
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-2 text-center">
+                      <button
+                        onClick={() => openOpnameModal(item)}
+                        className="text-gray-500 hover:text-blue-600"
+                        title="Edit Stock / Opname"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -123,6 +183,7 @@ export default function StockTab({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Helper info and export buttons */}
         <div className="bg-white rounded-lg shadow border p-4 flex flex-col gap-3">
           <h2 className="font-bold text-gray-700 flex items-center gap-2">
             <FileText size={18} /> Data Management
@@ -177,6 +238,62 @@ export default function StockTab({
           </ul>
         </div>
       </div>
+
+      {/* Stock Opname Modal */}
+      {isOpnameModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="font-bold text-lg mb-4 text-gray-800">Stock Opname / Edit Stock</h3>
+            <p className="text-sm text-gray-600 mb-2">
+              Barang: <strong>{selectedProductForOpname?.name}</strong>
+            </p>
+            <form onSubmit={handleOpnameSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stok Fisik (Real)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  className="w-full border rounded px-3 py-2"
+                  value={opnameRealStock}
+                  onChange={(e) => setOpnameRealStock(e.target.value)}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Catatan (Opsional)
+                </label>
+                <textarea
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  rows="2"
+                  placeholder="Alasan perubahan stok..."
+                  value={opnameNote}
+                  onChange={(e) => setOpnameNote(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeOpnameModal}
+                  disabled={processingOpname}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={processingOpname}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {processingOpname ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
