@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\TransactionItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -16,56 +17,51 @@ class DashboardController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
-        // Note: Postgres is case-sensitive with double quotes.
-        // Table names: "TransactionItem", "Transaction"
-        // Columns: "qty", "price", "cost", "discountPerUnit", "transactionId", "date"
+        // Create cache key based on date range
+        $cacheKey = 'dashboard_stats_' . ($startDate ?? 'all') . '_' . ($endDate ?? 'now');
 
-        $query = TransactionItem::query()
-            ->join('Transaction', 'TransactionItem.transactionId', '=', 'Transaction.id')
-            ->where('TransactionItem.type', 'ITEM');
+        // Cache for 30 seconds to reduce database load
+        return Cache::remember($cacheKey, 30, function () use ($startDate, $endDate) {
+            // 1. Stock Ready - Simple sum, no joins needed
+            $stockReady = Product::sum('stock');
 
-        // Apply date filter
-        if ($startDate) {
-            $query->whereDate('Transaction.date', '>=', $startDate);
-        }
-        if ($endDate) {
-            $query->whereDate('Transaction.date', '<=', $endDate);
-        }
+            // 2. Build base query for transactions
+            $baseQuery = TransactionItem::query()
+                ->join('Transaction', 'TransactionItem.transactionId', '=', 'Transaction.id')
+                ->where('TransactionItem.type', 'ITEM');
 
-        $stockReady = Product::sum('stock');
+            // Apply date filters
+            if ($startDate) {
+                $baseQuery->whereDate('Transaction.date', '>=', $startDate);
+            }
+            if ($endDate) {
+                $baseQuery->whereDate('Transaction.date', '<=', $endDate);
+            }
 
-        $stats = $query->select(
-            DB::raw('SUM("TransactionItem"."qty") as qty_sold'),
-            DB::raw('SUM(("TransactionItem"."price" * "TransactionItem"."qty") - (COALESCE("TransactionItem"."discountPerUnit", 0) * "TransactionItem"."qty")) as revenue'),
-            DB::raw('SUM((("TransactionItem"."price" - "TransactionItem"."cost" - COALESCE("TransactionItem"."discountPerUnit", 0)) * "TransactionItem"."qty")) as profit')
-        )->first();
+            // 3. Get stats in single query
+            $stats = $baseQuery->select(
+                DB::raw('SUM("TransactionItem"."qty") as qty_sold'),
+                DB::raw('SUM(("TransactionItem"."price" * "TransactionItem"."qty") - (COALESCE("TransactionItem"."discountPerUnit", 0) * "TransactionItem"."qty")) as revenue'),
+                DB::raw('SUM((("TransactionItem"."price" - "TransactionItem"."cost" - COALESCE("TransactionItem"."discountPerUnit", 0)) * "TransactionItem"."qty")) as profit')
+            )->first();
 
-        // 5. Chart Data (Daily Revenue)
-        $chartQuery = TransactionItem::query()
-            ->join('Transaction', 'TransactionItem.transactionId', '=', 'Transaction.id');
+            // 4. Chart Data - Use same base query for consistency
+            $chartQuery = clone $baseQuery;
+            $chartData = $chartQuery->select(
+                DB::raw('DATE("Transaction"."date") as date'),
+                DB::raw('SUM(("TransactionItem"."price" * "TransactionItem"."qty") - (COALESCE("TransactionItem"."discountPerUnit", 0) * "TransactionItem"."qty")) as revenue')
+            )
+                ->groupBy(DB::raw('DATE("Transaction"."date")'))
+                ->orderBy('date', 'asc')
+                ->get();
 
-        if ($startDate) {
-            $chartQuery->whereDate('Transaction.date', '>=', $startDate);
-        }
-        if ($endDate) {
-            $chartQuery->whereDate('Transaction.date', '<=', $endDate);
-        }
-
-        // Group by Date.
-        $chartData = $chartQuery->select(
-            DB::raw('DATE("Transaction"."date") as date'),
-            DB::raw('SUM(("TransactionItem"."price" * "TransactionItem"."qty") - (COALESCE("TransactionItem"."discountPerUnit", 0) * "TransactionItem"."qty")) as revenue')
-        )
-            ->groupBy(DB::raw('DATE("Transaction"."date")'))
-            ->orderBy('date', 'asc')
-            ->get();
-
-        return response()->json([
-            'stock_ready' => (int) $stockReady,
-            'qty_sold' => (int) $stats->qty_sold,
-            'revenue' => (float) $stats->revenue,
-            'profit' => (float) $stats->profit,
-            'chart_data' => $chartData
-        ]);
+            return response()->json([
+                'stock_ready' => (int) $stockReady,
+                'qty_sold' => (int) ($stats->qty_sold ?? 0),
+                'revenue' => (float) ($stats->revenue ?? 0),
+                'profit' => (float) ($stats->profit ?? 0),
+                'chart_data' => $chartData
+            ]);
+        });
     }
 }
