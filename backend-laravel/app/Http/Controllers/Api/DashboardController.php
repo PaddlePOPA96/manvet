@@ -20,8 +20,8 @@ class DashboardController extends Controller
         // Create cache key based on date range
         $cacheKey = 'dashboard_stats_' . ($startDate ?? 'all') . '_' . ($endDate ?? 'now');
 
-        // Cache for 30 seconds to reduce database load
-        return Cache::remember($cacheKey, 30, function () use ($startDate, $endDate) {
+        // Cache for 5 minutes to reduce database load
+        return Cache::remember($cacheKey, 300, function () use ($startDate, $endDate) {
             // 1. Stock Ready - Simple sum, no joins needed
             $stockReady = Product::sum('stock');
 

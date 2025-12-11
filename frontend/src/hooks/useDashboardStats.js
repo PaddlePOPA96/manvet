@@ -26,8 +26,8 @@ export function useDashboardStats(periodPreset, periodFrom, periodTo) {
             // Create cache key based on period parameters
             const cacheKey = `dashboard-${periodPreset}-${periodFrom}-${periodTo}`;
 
-            // Check if we have valid cached data
-            if (isCacheValid(cacheKey, 30000)) { // Cache for 30 seconds
+            // Check if we have valid cached data (5 minutes cache)
+            if (isCacheValid(cacheKey, 300000)) { // Cache for 5 minutes instead of 30 seconds
                 const cached = getCachedData(cacheKey);
                 if (cached && cached.data) {
                     setStats(cached.data);
