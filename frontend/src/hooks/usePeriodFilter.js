@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { SALE_CONDITIONS } from "../constants/inventory";
 
 function getTxDateKey(tx) {
-  if (tx.date) return tx.date;
+  if (tx.date) return tx.date.split("T")[0]; // Use YYYY-MM-DD only
   if (tx.timestamp) {
     try {
       return new Date(tx.timestamp).toISOString().split("T")[0];

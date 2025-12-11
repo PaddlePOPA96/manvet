@@ -68,7 +68,7 @@ export default function ProductStockTimelineChart({
       const condition = tx.condition || "";
       const type = tx.type;
 
-      if (type === "IN") {
+      if (type === "MASUK") {
         if (
           [
             "Barang Diterima dari Produksi",
@@ -84,7 +84,7 @@ export default function ProductStockTimelineChart({
           waste += qty;
           stock -= qty;
         }
-      } else if (type === "OUT") {
+      } else if (type === "KELUAR") {
         if (
           ["Defects / Cacat Produksi", "Kadaluarsa"].includes(
             condition
