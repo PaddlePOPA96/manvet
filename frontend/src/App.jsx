@@ -3,6 +3,7 @@ import LoginScreen from "./components/LoginScreen";
 import StockTab from "./components/StockTab";
 import PeriodFilterBar from "./components/PeriodFilterBar";
 import MainLayout from "./components/MainLayout";
+import { DashboardCacheProvider } from "./contexts/DashboardCacheContext";
 
 const DashboardTab = React.lazy(() => import("./components/DashboardTab"));
 const ProductManager = React.lazy(() => import("./components/ProductManager"));
@@ -152,142 +153,144 @@ export default function InventoryApp() {
   }
 
   return (
-    <MainLayout
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      canAccessTab={canAccessTab}
-      userRole={userRole}
-      currentUser={currentUser}
-      onLogout={handleLogoutClick}
-    >
-      <PeriodFilterBar
+    <DashboardCacheProvider>
+      <MainLayout
         activeTab={activeTab}
-        periodPreset={periodPreset}
-        periodFrom={periodFrom}
-        periodTo={periodTo}
-        setPeriodPreset={setPeriodPreset}
-        setPeriodFrom={setPeriodFrom}
-        setPeriodTo={setPeriodTo}
-      />
-      <Suspense
-        fallback={
-          <div className="py-10 text-center text-sm text-gray-500">
-            Memuat konten...
-          </div>
-        }
+        onTabChange={setActiveTab}
+        canAccessTab={canAccessTab}
+        userRole={userRole}
+        currentUser={currentUser}
+        onLogout={handleLogoutClick}
       >
-        {activeTab === "dashboard" && (
-          <DashboardTab
-            periodPreset={periodPreset}
-            periodFrom={periodFrom}
-            periodTo={periodTo}
-          />
-        )}
+        <PeriodFilterBar
+          activeTab={activeTab}
+          periodPreset={periodPreset}
+          periodFrom={periodFrom}
+          periodTo={periodTo}
+          setPeriodPreset={setPeriodPreset}
+          setPeriodFrom={setPeriodFrom}
+          setPeriodTo={setPeriodTo}
+        />
+        <Suspense
+          fallback={
+            <div className="py-10 text-center text-sm text-gray-500">
+              Memuat konten...
+            </div>
+          }
+        >
+          {activeTab === "dashboard" && (
+            <DashboardTab
+              periodPreset={periodPreset}
+              periodFrom={periodFrom}
+              periodTo={periodTo}
+            />
+          )}
 
-        {activeTab === "stock" && (
-          <StockTab
-            products={products}
-            filteredInventory={filteredInventory}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            showLowStockOnly={showLowStockOnly}
-            setShowLowStockOnly={setShowLowStockOnly}
-            backupData={backupData}
-            downloadCSV={downloadCSV}
-            fileInputRef={fileInputRef}
-            handleRestore={handleRestore}
-            onSelectProduct={(name) => {
-              setSelectedProductName(name);
-              setActiveTab("productDetail");
-            }}
-            adjustStockFn={adjustStock} // Pass the function directly
-          />
-        )}
+          {activeTab === "stock" && (
+            <StockTab
+              products={products}
+              filteredInventory={filteredInventory}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              showLowStockOnly={showLowStockOnly}
+              setShowLowStockOnly={setShowLowStockOnly}
+              backupData={backupData}
+              downloadCSV={downloadCSV}
+              fileInputRef={fileInputRef}
+              handleRestore={handleRestore}
+              onSelectProduct={(name) => {
+                setSelectedProductName(name);
+                setActiveTab("productDetail");
+              }}
+              adjustStockFn={adjustStock} // Pass the function directly
+            />
+          )}
 
-        {activeTab === "products" && (
-          <ProductManager
-            products={products}
-            categories={categories}
-            units={units}
-            onAdd={handleAddProduct}
-            onEdit={handleEditProduct}
-            onDelete={handleDeleteProduct}
-            canManage={canManageProducts}
-          />
-        )}
+          {activeTab === "products" && (
+            <ProductManager
+              products={products}
+              categories={categories}
+              units={units}
+              onAdd={handleAddProduct}
+              onEdit={handleEditProduct}
+              onDelete={handleDeleteProduct}
+              canManage={canManageProducts}
+            />
+          )}
 
-        {activeTab === "pos" && (
-          <POSSystem
-            products={products}
-            onSubmit={addTransaction}
-            canCreate={canCreateTransactions}
-          />
-        )}
+          {activeTab === "pos" && (
+            <POSSystem
+              products={products}
+              onSubmit={addTransaction}
+              canCreate={canCreateTransactions}
+            />
+          )}
 
-        {activeTab === "in" && (
-          <BatchTransactionForm
-            type="IN"
-            title="Purchases / Barang Masuk"
-            products={products}
-            conditions={CONDITIONS_IN}
-            onSubmit={addStockMutation}
-            bgColor="bg-emerald-50"
-            btnColor="bg-emerald-600 hover:bg-emerald-700"
-            canCreate={canCreateTransactions}
-          />
-        )}
+          {activeTab === "in" && (
+            <BatchTransactionForm
+              type="IN"
+              title="Purchases / Barang Masuk"
+              products={products}
+              conditions={CONDITIONS_IN}
+              onSubmit={addStockMutation}
+              bgColor="bg-emerald-50"
+              btnColor="bg-emerald-600 hover:bg-emerald-700"
+              canCreate={canCreateTransactions}
+            />
+          )}
 
-        {activeTab === "out" && (
-          <BatchTransactionForm
-            type="OUT"
-            title="Barang Keluar / Penjualan"
-            products={products}
-            conditions={CONDITIONS_OUT}
-            onSubmit={addStockMutation}
-            bgColor="bg-red-50"
-            btnColor="bg-red-600 hover:bg-red-700"
-            canCreate={canCreateTransactions}
-          />
-        )}
+          {activeTab === "out" && (
+            <BatchTransactionForm
+              type="OUT"
+              title="Barang Keluar / Penjualan"
+              products={products}
+              conditions={CONDITIONS_OUT}
+              onSubmit={addStockMutation}
+              bgColor="bg-red-50"
+              btnColor="bg-red-600 hover:bg-red-700"
+              canCreate={canCreateTransactions}
+            />
+          )}
 
-        {activeTab === "history" && (
-          <HistoryTab
-            transactions={filteredTransactions}
-            products={products}
-            conditionChartData={conditionChartData}
-            conditionChartLimit={conditionChartLimit}
-            setConditionChartLimit={setConditionChartLimit}
-            onDelete={deleteTransaction}
-          />
-        )}
+          {activeTab === "history" && (
+            <HistoryTab
+              transactions={filteredTransactions}
+              products={products}
+              conditionChartData={conditionChartData}
+              conditionChartLimit={conditionChartLimit}
+              setConditionChartLimit={setConditionChartLimit}
+              onDelete={deleteTransaction}
+            />
+          )}
 
-        {activeTab === "productDetail" && selectedProductName && (
-          <ProductDetailTab
-            productName={selectedProductName}
-            inventoryData={inventoryData}
-            transactions={filteredTransactions}
-            onBack={() => setActiveTab("stock")}
-          />
-        )}
+          {activeTab === "productDetail" && selectedProductName && (
+            <ProductDetailTab
+              productName={selectedProductName}
+              inventoryData={inventoryData}
+              transactions={filteredTransactions}
+              onBack={() => setActiveTab("stock")}
+            />
+          )}
 
-        {activeTab === "access" && userRole === "superadmin" && (
-          <UserAccessManager />
-        )}
+          {activeTab === "access" && userRole === "superadmin" && (
+            <UserAccessManager />
+          )}
 
-        {activeTab === "profile" && <ProfileTab />}
+          {activeTab === "profile" && <ProfileTab />}
 
-        {activeTab === "master" && (
-          <MasterDataTab
-            categories={categories}
-            units={units}
-            onAddCategory={addCategory}
-            onDeleteCategory={deleteCategory}
-            onUpdateUnits={setUnits}
-          />
-        )}
+          {activeTab === "master" && (
+            <MasterDataTab
+              categories={categories}
+              units={units}
+              onAddCategory={addCategory}
+              onDeleteCategory={deleteCategory}
+              onUpdateUnits={setUnits}
+            />
+          )}
 
-        {activeTab === "settings" && <SettingsTab />}
-      </Suspense>
-    </MainLayout>
+          {activeTab === "settings" && <SettingsTab />}
+        </Suspense>
+      </MainLayout>
+    </DashboardCacheProvider>
   );
 }

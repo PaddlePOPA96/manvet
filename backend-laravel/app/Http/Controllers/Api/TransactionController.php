@@ -14,8 +14,9 @@ class TransactionController extends Controller
     {
         $limit = request()->query('limit', 10);
 
+        // Eager load all relationships including category to avoid N+1
         $transactions = Transaction::with([
-            'items.product',
+            'items.product.category', // Eager load category!
             'items.package' => function ($query) {
                 $query->with('products');
             }
@@ -71,7 +72,7 @@ class TransactionController extends Controller
                     'discountPerUnit' => $item['discount'] ?? 0
                 ]);
 
-                // Handle Stock Deduction (omitted for brevity, assume unchanged logic)
+                // Handle Stock Deduction
                 if ($item['type'] === 'ITEM' && !empty($item['productId'])) {
                     $product = \App\Models\Product::find($item['productId']);
                     if ($product) {
@@ -105,7 +106,7 @@ class TransactionController extends Controller
 
             // Load relations and flatten
             $transaction->load([
-                'items.product',
+                'items.product.category', // Eager load category
                 'items.package.products'
             ]);
 
@@ -142,8 +143,9 @@ class TransactionController extends Controller
                 ? ($item->package->name ?? 'Unknown Package')
                 : ($item->product->name ?? 'Unknown Product');
 
-            $category = $item->type === 'ITEM' && $item->product && $item->product->categoryId
-                ? \App\Models\Category::find($item->product->categoryId)?->name
+            // Use eager loaded category instead of querying
+            $category = $item->type === 'ITEM' && $item->product && $item->product->category
+                ? $item->product->category->name
                 : 'Package';
 
             return [
