@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Search, Filter, FileText, List, Download, Upload, Edit } from "lucide-react";
+import { Filter, FileText, List, Download, Upload, Edit } from "lucide-react";
 import { formatRupiah } from "../utils/format";
+import { Card, Button, Badge, SearchInput, Modal, Input } from "./ui";
 
 export default function StockTab({
   products,
@@ -68,34 +69,23 @@ export default function StockTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+      <Card title="Stok Barang">
         <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-          <h2 className="font-bold text-gray-700">Stok Barang</h2>
           <div className="flex gap-2 w-full md:w-auto">
-            <button
+            <Button
+              variant={showLowStockOnly ? "primary" : "secondary"}
+              size="sm"
+              icon={<Filter size={14} />}
               onClick={() => setShowLowStockOnly(!showLowStockOnly)}
-              className={`flex items-center gap-2 px-3 py-1 rounded border text-sm transition ${showLowStockOnly
-                  ? "bg-orange-100 border-orange-300 text-orange-800"
-                  : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                }`}
             >
-              <Filter size={14} />{" "}
-              {showLowStockOnly
-                ? "Tampilkan Semua"
-                : "Filter Stok Menipis"}
-            </button>
-            <div className="relative flex-1 md:flex-none">
-              <Search
-                className="absolute left-2 top-2 text-gray-400"
-                size={16}
-              />
-              <input
-                className="pl-8 pr-4 py-1 border rounded text-sm w-full"
-                placeholder="Cari..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+              {showLowStockOnly ? "Tampilkan Semua" : "Filter Stok Menipis"}
+            </Button>
+            <SearchInput
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari..."
+              className="flex-1 md:flex-none md:w-64"
+            />
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -152,17 +142,11 @@ export default function StockTab({
                     </td>
                     <td className="px-4 py-2 text-center">
                       {item.stock <= 0 ? (
-                        <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700 font-semibold">
-                          HABIS
-                        </span>
+                        <Badge variant="danger">HABIS</Badge>
                       ) : item.stock < 10 ? (
-                        <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-700 font-semibold">
-                          MENIPIS
-                        </span>
+                        <Badge variant="warning">MENIPIS</Badge>
                       ) : (
-                        <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700 font-semibold">
-                          AMAN
-                        </span>
+                        <Badge variant="success">AMAN</Badge>
                       )}
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -180,28 +164,35 @@ export default function StockTab({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Helper info and export buttons */}
-        <div className="bg-white rounded-lg shadow border p-4 flex flex-col gap-3">
-          <h2 className="font-bold text-gray-700 flex items-center gap-2">
-            <FileText size={18} /> Data Management
-          </h2>
+        <Card
+          title={
+            <div className="flex items-center gap-2">
+              <FileText size={18} /> Data Management
+            </div>
+          }
+        >
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Download size={16} />}
               onClick={backupData}
-              className="flex items-center gap-2 bg-teal-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-teal-700"
             >
-              <Download size={16} /> Backup JSON
-            </button>
-            <button
+              Backup JSON
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Download size={16} />}
               onClick={downloadCSV}
-              className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-blue-700"
             >
-              <Download size={16} /> Export CSV
-            </button>
-            <label className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded text-sm font-semibold cursor-pointer hover:bg-gray-200">
+              Export CSV
+            </Button>
+            <label className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">
               <Upload size={16} />
               Restore JSON
               <input
@@ -213,15 +204,18 @@ export default function StockTab({
               />
             </label>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 mt-3">
             Backup & restore akan menggunakan database Firebase sebagai
             sumber utama, sehingga data bisa dipakai di banyak device.
           </p>
-        </div>
-        <div className="bg-white rounded-lg shadow border p-4">
-          <h2 className="font-bold text-gray-700 flex items-center gap-2 mb-2">
-            <List size={18} /> Info Singkat
-          </h2>
+        </Card>
+        <Card
+          title={
+            <div className="flex items-center gap-2">
+              <List size={18} /> Info Singkat
+            </div>
+          }
+        >
           <ul className="text-xs text-gray-600 space-y-1">
             <li>
               • Tab <b>Kasir</b> untuk transaksi penjualan POS.
@@ -236,64 +230,63 @@ export default function StockTab({
               • Tab <b>Data</b> untuk riwayat semua transaksi.
             </li>
           </ul>
-        </div>
+        </Card>
       </div>
 
       {/* Stock Opname Modal */}
-      {isOpnameModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="font-bold text-lg mb-4 text-gray-800">Stock Opname / Edit Stock</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Barang: <strong>{selectedProductForOpname?.name}</strong>
-            </p>
-            <form onSubmit={handleOpnameSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stok Fisik (Real)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  className="w-full border rounded px-3 py-2"
-                  value={opnameRealStock}
-                  onChange={(e) => setOpnameRealStock(e.target.value)}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Catatan (Opsional)
-                </label>
-                <textarea
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  rows="2"
-                  placeholder="Alasan perubahan stok..."
-                  value={opnameNote}
-                  onChange={(e) => setOpnameNote(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeOpnameModal}
-                  disabled={processingOpname}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={processingOpname}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {processingOpname ? 'Menyimpan...' : 'Simpan Perubahan'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isOpnameModalOpen}
+        onClose={closeOpnameModal}
+        title="Stock Opname / Edit Stock"
+        size="sm"
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          Barang: <strong>{selectedProductForOpname?.name}</strong>
+        </p>
+        <form onSubmit={handleOpnameSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Stok Fisik (Real)
+            </label>
+            <Input
+              type="number"
+              required
+              min="0"
+              value={opnameRealStock}
+              onChange={(e) => setOpnameRealStock(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Catatan (Opsional)
+            </label>
+            <textarea
+              className="w-full border rounded px-3 py-2 text-sm"
+              rows="2"
+              placeholder="Alasan perubahan stok..."
+              value={opnameNote}
+              onChange={(e) => setOpnameNote(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={closeOpnameModal}
+              disabled={processingOpname}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={processingOpname}
+            >
+              {processingOpname ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
